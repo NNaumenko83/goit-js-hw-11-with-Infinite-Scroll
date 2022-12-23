@@ -1,16 +1,11 @@
 import './css/styles.css';
 import PhotoApiService from './photo-service';
-import LoadMoreBtn from './load-more-btn';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import throttle from 'lodash.throttle';
 
 const photosApiService = new PhotoApiService();
-
-const loadMoreBtn = new LoadMoreBtn({
-  selector: '[data-action="load-more"]',
-  hidden: true,
-});
 
 const refs = {
   searchForm: document.querySelector('#search-form'),
@@ -22,7 +17,6 @@ const lightbox = new SimpleLightbox('.gallery a', {
 });
 
 refs.searchForm.addEventListener('submit', onSearch);
-loadMoreBtn.refs.button.addEventListener('click', onLoadMoreBtnClick);
 
 async function onSearch(e) {
   e.preventDefault();
@@ -48,14 +42,14 @@ async function onSearch(e) {
 
   if (!photosApiService.query) {
     Notify.failure('Sorry, but you must enter a value');
-    loadMoreBtn.hide();
+
     return;
   }
 
   photosApiService.resetPage();
   photosApiService.resetTotalLoadedPhoto();
   photosApiService.resettotalHits();
-  loadMoreBtn.hide();
+  photosApiService.isAllLoaded = false;
 
   try {
     const photosResponse = await photosApiService.fetchPhotos();
@@ -78,28 +72,48 @@ async function onSearch(e) {
       );
       return;
     }
-
-    loadMoreBtn.show();
   } catch (err) {
     console.log(err);
   }
 }
 
-async function onLoadMoreBtnClick() {
-  try {
-    const photosResponse = await photosApiService.fetchPhotos();
-    const photoArray = await photosResponse.hits;
+window.addEventListener(
+  'scroll',
+  throttle(() => {
+    // console.log('scrollY:', window.scrollY); //scrolled from top
+    // console.log('innerHeight:', window.innerHeight); //visible part of screen
+    // console.log('scrollHeigth:', document.documentElement.scrollHeight);
+    // console.log(
+    //   document.documentElement.scrollHeight -
+    //     (window.scrollY + window.innerHeight)
+    // );
 
-    renderPhotos(photoArray);
-    if (photosApiService.totalLoadedPhoto >= photosApiService.totalHits) {
-      Notify.failure(
-        "We're sorry, but you've reached the end of search results."
-      );
-      loadMoreBtn.hide();
-      return;
+    if (
+      document.documentElement.scrollHeight -
+        (window.scrollY + window.innerHeight) <=
+      400
+      // window.scrollY + window.innerHeight >=
+      // document.documentElement.scrollHeight
+    ) {
+      loadImages();
     }
-  } catch (err) {
-    console.log(err);
+  }, 400)
+);
+
+async function loadImages() {
+  if (photosApiService.isAllLoaded === false)
+    try {
+      const photosResponse = await photosApiService.fetchPhotos();
+      console.log('page: ', photosApiService.page);
+      const photoArray = await photosResponse.hits;
+
+      renderPhotos(photoArray);
+    } catch (err) {
+      console.log(err);
+    }
+  if (photosApiService.totalLoadedPhoto >= photosApiService.totalHits) {
+    photosApiService.isAllLoaded = true;
+    return;
   }
 }
 

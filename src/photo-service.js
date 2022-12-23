@@ -9,6 +9,7 @@ export default class PhotoApiService {
     this.page = 1;
     this.totalLoadedPhoto = 0;
     this.totalHits = 0;
+    this.isAllLoaded = false;
   }
 
   async fetchPhotos() {
@@ -35,6 +36,7 @@ export default class PhotoApiService {
 
   incrementPage() {
     this.page += 1;
+    console.log(this.page);
   }
 
   incrementQuantityLoadedPhoto(value) {
